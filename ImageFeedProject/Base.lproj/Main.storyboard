@@ -9,10 +9,10 @@
         <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
     </dependencies>
     <scenes>
-        <!--Item-->
+        <!--ImageList-->
         <scene sceneID="tne-QT-ifu">
             <objects>
-                <viewController id="BYZ-38-t0r" customClass="ImagesListViewController" customModule="ImageFeedProject" customModuleProvider="target" sceneMemberID="viewController">
+                <viewController id="BYZ-38-t0r" userLabel="ImageList" customClass="ImagesListViewController" customModule="ImageFeedProject" customModuleProvider="target" sceneMemberID="viewController">
                     <view key="view" contentMode="scaleToFill" id="8bC-Xf-vdC">
                         <rect key="frame" x="0.0" y="0.0" width="393" height="852"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
@@ -86,7 +86,7 @@
                             <constraint firstAttribute="trailingMargin" secondItem="f3m-oF-RtP" secondAttribute="trailing" id="hu3-rR-TE5"/>
                         </constraints>
                     </view>
-                    <tabBarItem key="tabBarItem" title="Item" image="tab_editorial_active" id="bxf-iv-cJX"/>
+                    <tabBarItem key="tabBarItem" title="" image="tab_editorial_active" id="bxf-iv-cJX"/>
                     <navigationItem key="navigationItem" id="4Qd-Tj-FcH"/>
                     <connections>
                         <outlet property="tableView" destination="f3m-oF-RtP" id="ZXj-pj-0pl"/>
