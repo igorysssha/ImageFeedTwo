@@ -17,8 +17,8 @@ final class SingleImageViewController: UIViewController {
         }
     }
     
-    @IBOutlet weak var shareButton: NSLayoutConstraint!
-    @IBOutlet weak var scrollView: UIScrollView!
+    @IBOutlet private var shareButton: NSLayoutConstraint!
+    @IBOutlet private var scrollView: UIScrollView!
     @IBOutlet private var imageView: UIImageView!
     
     override func viewDidLoad() {
@@ -27,7 +27,6 @@ final class SingleImageViewController: UIViewController {
         scrollView.maximumZoomScale = 1.25
         imageView.image = image
         rescaleAndCenterImageInScrollView(image: image)
-        
     }
     @IBAction func didTapBackButton(_ sender: UIButton) {
         dismiss(animated: true, completion: nil)
