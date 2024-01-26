@@ -15,7 +15,7 @@ class SplashViewController: UIViewController {
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         
-        if let token = oauth2Service.authToken {
+        if oauth2Service.authToken != nil {
             switchToTabBarController()
         } else {
             performSegue(withIdentifier: ShowAuthenticationScreenSegueIdentifier, sender: nil)

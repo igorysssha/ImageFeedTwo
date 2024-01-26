@@ -11,7 +11,6 @@ enum NetworkError: Error {
     case httpStatusCode(Int)
     case urlRequestError(Error)
     case urlSessionError
-    
 }
 
 final class OAuth2Service {
@@ -20,15 +19,15 @@ final class OAuth2Service {
     private let urlSession = URLSession.shared
      
     private (set) var authToken: String? {
-            get {
-                return OAuth2TokenStorage().token
-            }
-            set {
-                OAuth2TokenStorage().token = newValue
-    } }
+        get {
+            return OAuth2TokenStorage().token
+        }
+        set {
+            OAuth2TokenStorage().token = newValue
+        }
+    }
     
     func fetchOAuthToken(_ code: String, completion: @escaping (Result<String, Error>) -> Void) {
-        
         var components =  URLComponents(string: "https://unsplash.com/oauth/token")
         components?.queryItems = [
         URLQueryItem(name: "client_id", value: AccessKey),
@@ -94,11 +93,11 @@ extension URLSession {
             DispatchQueue.main.async {
                 completion(result)
             }
-}
+        }
         let task = dataTask(with: request, completionHandler: { data, response, error in
             if let data = data,
-                let response = response,
-                let statusCode = (response as? HTTPURLResponse)?.statusCode
+               let response = response,
+               let statusCode = (response as? HTTPURLResponse)?.statusCode
             {
                 if 200 ..< 300 ~= statusCode {
                     fulfillCompletion(.success(data))
@@ -114,7 +113,8 @@ extension URLSession {
         task.resume()
         return task
         
-} }
+    }
+}
 
 extension OAuth2Service {
     private func object(
