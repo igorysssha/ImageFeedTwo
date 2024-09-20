@@ -11,11 +11,11 @@ class ImagesListViewController: UIViewController {
     @IBOutlet private var tableView: UITableView!
     
     
-    private let photosName: [String] = Array(0..<20).map{ "\($0)" }
+    private let photosName: [String] = Array(0..<21).map{ "\($0)" }
     private let ShowSingleImageSegueIdentifer = "ShowSingleImage"
     
     private lazy var dateFormatter: DateFormatter = {
-       let formatter = DateFormatter()
+        let formatter = DateFormatter()
         formatter.dateStyle = .long
         formatter.timeStyle = .none
         formatter.locale = Locale(identifier: "ru_RU")
@@ -34,13 +34,13 @@ class ImagesListViewController: UIViewController {
             let viewController = segue.destination as! SingleImageViewController
             let indexPath = sender as! IndexPath
             let image = UIImage(named: photosName[indexPath.row])
-           // _ = viewController.view // CRACH FIXED?
+            // _ = viewController.view // CRACH FIXED?
             viewController.image = image
         } else {
             super.prepare(for: segue, sender: sender)
         }
     }
-
+    
 }
 
 extension ImagesListViewController: UITableViewDelegate {

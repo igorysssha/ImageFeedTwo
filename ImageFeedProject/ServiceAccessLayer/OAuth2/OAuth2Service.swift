@@ -7,6 +7,10 @@
 
 import Foundation
 
+enum AuthServiceError: Error {
+    case invalidRequest
+}
+
 enum NetworkError: Error {
     case httpStatusCode(Int)
     case urlRequestError(Error)
@@ -15,10 +19,14 @@ enum NetworkError: Error {
 
 final class OAuth2Service {
     static let shared = OAuth2Service()
+    private init() {}
     
     private let urlSession = URLSession.shared
-     
-    private (set) var authToken: String? {
+    
+    private var task: URLSessionTask?
+    private var lastCode: String?
+    
+    private(set) var authToken: String? {
         get {
             return OAuth2TokenStorage().token
         }
@@ -30,11 +38,11 @@ final class OAuth2Service {
     func fetchOAuthToken(_ code: String, completion: @escaping (Result<String, Error>) -> Void) {
         var components =  URLComponents(string: "https://unsplash.com/oauth/token")
         components?.queryItems = [
-        URLQueryItem(name: "client_id", value: AccessKey),
-        URLQueryItem(name: "client_secret", value: SecretKey),
-        URLQueryItem(name: "redirect_uri", value: RedirectURI),
-        URLQueryItem(name: "code", value: code),
-        URLQueryItem(name: "grant_type", value: "authorization_code")
+            URLQueryItem(name: "client_id", value: AccessKey),
+            URLQueryItem(name: "client_secret", value: SecretKey),
+            URLQueryItem(name: "redirect_uri", value: RedirectURI),
+            URLQueryItem(name: "code", value: code),
+            URLQueryItem(name: "grant_type", value: "authorization_code")
         ]
         
         if let url = components?.url {
@@ -42,17 +50,33 @@ final class OAuth2Service {
             request.httpMethod = "POST"
             
             let task = object(for: request) { [weak self] result in
-                        guard let self = self else { return }
-                        switch result {
-                        case .success(let body):
-                            let authToken = body.accessToken
-                            self.authToken = authToken
-                            completion(.success(authToken))
-                        case .failure(let error):
-                            completion(.failure(error))
-            } }
-                    task.resume()
+                DispatchQueue.main.async {
+                    guard let self = self else { return }
+                    switch result {
+                    case .success(let body):
+                        let authToken = body.accessToken
+                        self.authToken = authToken
+                        completion(.success(authToken))
+                    case .failure(let error):
+                        completion(.failure(error))
+                    }
+                    self.task = nil
+                    self.lastCode = nil
+                }
+            }
+            self.task = task
+            task.resume()
         }
+        if authToken == nil {
+            return
+        }
+        assert(Thread.isMainThread)
+        guard lastCode != authToken && lastCode != nil else {
+            completion(.failure(AuthServiceError.invalidRequest))
+            return
+        }
+        task?.cancel()
+        lastCode = authToken
     }
     
     private struct OAuthTokenResponseBody: Codable {
@@ -130,3 +154,4 @@ extension OAuth2Service {
         }
     }
 }
+
