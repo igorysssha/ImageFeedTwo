@@ -1,10 +1,3 @@
-//
-//  ProfileService.swift
-//  ImageFeedProject
-//
-//  Created by  Игорь Килеев on 11.03.2024.
-//
-
 import Foundation
 
 enum ProfileError: Error {
@@ -17,55 +10,60 @@ final class ProfileService: ProfileServiceProtocol {
     private init() {}
     private(set) var profile: Profile?
     
-    let token = OAuth2TokenStorage().token
+    private let urlSession = URLSession.shared
     
-    func makeProfileRequest(withToken token: String )-> URLRequest {
-        let url = URL(string: "https://api.unsplash.com/me")!
+    private var task: URLSessionTask?
+    
+    private var token: String? {
+        return OAuth2TokenStorage().token
+    }
+    
+    func fetchProfile(_ token: String, completion: @escaping (Result<Profile, Error>) -> Void) {
+        guard let request = makeProfileRequest(withToken: token) else {
+            completion(.failure(ProfileError.other(URLError(.badURL))))
+            return
+        }
+        
+        // Отменяем предыдущую задачу, если она есть
+        task?.cancel()
+        
+        let task = urlSession.objectTask(for: request) { [weak self] (result: Result<ProfileResult, Error>) in
+            guard let self = self else { return }
+            switch result {
+            case .success(let profileResult):
+                let profile = Profile(from: profileResult)
+                self.profile = profile
+                completion(.success(profile))
+            case .failure(let error):
+                if let urlError = error as? URLError, urlError.code == .cancelled {
+                    // Задача была отменена, ничего не делаем
+                    return
+                } else if let networkError = error as? NetworkError,
+                          case .httpStatusCode(let statusCode) = networkError,
+                          statusCode == 401 {
+                    print("[ProfileService]: Unauthorized - код ошибки \(statusCode)")
+                    completion(.failure(ProfileError.unauthorized))
+                } else {
+                    print("[ProfileService]: Ошибка получения профиля - \(error.localizedDescription)")
+                    completion(.failure(ProfileError.other(error)))
+                }
+            }
+        }
+        self.task = task
+        task.resume()
+    }
+    
+    private func makeProfileRequest(withToken token: String) -> URLRequest? {
+        guard let url = URL(string: "https://api.unsplash.com/me") else {
+            return nil
+        }
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         return request
     }
-    
-    func fetchProfile(_ token: String, completion: @escaping (Result<Profile, Error>) -> Void) {
-        let request = makeProfileRequest(withToken: token)
-        
-        let task = URLSession.shared.dataTask(with: request) { data, response , error in
-            DispatchQueue.main.async {
-                if let error = error {
-                    completion(.failure(ProfileError.other(error)))
-                    return
-                }
-                guard let httpResponse = response as? HTTPURLResponse else {
-                    completion(.failure(ProfileError.other(URLError(.badServerResponse))))
-                    return
-                }
-                
-                guard httpResponse.statusCode == 200 else {
-                    if httpResponse.statusCode == 401 {
-                        completion(.failure(ProfileError.unauthorized))
-                    } else {
-                        completion(.failure(ProfileError.other(URLError(.badServerResponse))))
-                    }
-                    return
-                }
-                guard let data = data else {
-                    completion(.failure(ProfileError.other(URLError(.cannotParseResponse))))
-                    return
-                }
-                do {
-                    let profileResult = try JSONDecoder().decode(ProfileResult.self, from: data)
-                    let profile = Profile(from: profileResult)
-                    self.profile = profile
-                    completion(.success(profile))
-                } catch {
-                    completion(.failure(ProfileError.other(error)))
-                }
-            }
-        }
-        task.resume()
-    }
 }
+
 struct ProfileResult: Codable {
     let id: String
     let updatedAt: String
@@ -107,14 +105,9 @@ struct Profile {
     let bio: String
     
     init(from profileResult: ProfileResult) {
-        
         self.username = profileResult.username
         self.name = "\(profileResult.firstName ?? "") \(profileResult.lastName ?? "")"
         self.loginName = "@\(profileResult.username)"
         self.bio = profileResult.bio ?? ""
-        
     }
 }
-
-
-

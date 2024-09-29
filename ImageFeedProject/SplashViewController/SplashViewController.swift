@@ -13,28 +13,51 @@ class SplashViewController: UIViewController {
     
     private let profileImageService = ProfileImageService.shared
     
-    private let token = OAuth2TokenStorage().token
+    private var isFetchingProfile = false
+    
+    private lazy var splashScreenLogoImage: UIImageView = {
+        let splashScreenLogo = UIImageView()
+        return splashScreenLogo
+    }()
+    
+    //private let token = OAuth2TokenStorage().token
     
     private let ShowAuthenticationScreenSegueIdentifier = "ShowAuthenticationScreen"
     
-    private let oauth2Service = OAuth2Service.shared
+    //private let oauth2Service = OAuth2Service.shared
     
     private(set) var profileImageURL: String?
+    
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        view.backgroundColor = .ypBlack
+        setupScreen()
+        
+    }
     
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         
-        if oauth2Service.authToken != nil {
-            guard let token = token else { return }
-            
-            switchToTabBarController()
+        if let token = OAuth2TokenStorage().token {
+            // Если токен есть, загружаем профиль
             fetchProfile(token)
-            
-            print("Small Image URL: \(String(describing: ProfileImageService.shared.avatarURL))")
-            
         } else {
-            performSegue(withIdentifier: ShowAuthenticationScreenSegueIdentifier, sender: nil)
+            // Иначе переходим к экрану авторизации
+            showAuthViewController()
         }
+    }
+    
+    private func setupScreen() {
+        let safeArea = view.safeAreaLayoutGuide
+        let splashScreenLogoImage = self.splashScreenLogoImage
+        splashScreenLogoImage.image = UIImage(named: "splash_screen_logo")
+        
+        splashScreenLogoImage.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(splashScreenLogoImage)
+        NSLayoutConstraint.activate([
+            splashScreenLogoImage.centerXAnchor.constraint(equalTo: safeArea.centerXAnchor),
+            splashScreenLogoImage.centerYAnchor.constraint(equalTo: safeArea.centerYAnchor)
+        ])
     }
     
     private func switchToTabBarController() {
@@ -51,32 +74,35 @@ class SplashViewController: UIViewController {
 }
 
 extension SplashViewController {
-    override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
-        if segue.identifier == ShowAuthenticationScreenSegueIdentifier {
-            
-            guard
-                let navigationController = segue.destination as? UINavigationController,
-                let viewController = navigationController.viewControllers[0] as? AuthViewController
-                    
-            else { fatalError("Failed to prepare for \(ShowAuthenticationScreenSegueIdentifier)")}
-            
-            viewController.delegate = self
-            
-        } else {
-            super.prepare(for: segue, sender: sender)
+    private func showAuthViewController() {
+        let storyboard = UIStoryboard(name: "Main", bundle: .main)
+        guard let authViewController = storyboard.instantiateViewController(withIdentifier: "AuthViewController") as? AuthViewController else {
+            assertionFailure("Не удалось найти Auth")
+            return
+        }
+        authViewController.delegate = self
+        authViewController.modalPresentationStyle = .fullScreen
+        present(authViewController, animated: true, completion: nil)
+    }
+}
+
+
+extension SplashViewController: AuthViewControllerDelegate {
+    func authViewController(_ vc: AuthViewController, didAuthenticateWithToken token: String) {
+        // Сохраняем токен
+        OAuth2TokenStorage().token = token
+        // Закрываем AuthViewController
+        vc.dismiss(animated: true) {
+            // Загружаем профиль
+            self.fetchProfile(token)
         }
     }
 }
 
-extension SplashViewController: AuthViewControllerDelegate {
-    func didAuthenticate(_ vc: AuthViewController) {
-        vc.dismiss(animated: true)
-        guard let token = token else { return }
-        fetchProfile(token)
-        
-    }
-    
+extension SplashViewController {
     private func fetchProfile(_ token: String) {
+        guard !isFetchingProfile else { return }
+        isFetchingProfile = true
         DispatchQueue.main.async {
             UIBlockingProgressHUD.show()
             self.profileService.fetchProfile(token) { [weak self] result  in
@@ -86,13 +112,12 @@ extension SplashViewController: AuthViewControllerDelegate {
                 
                 switch result {
                 case .success(let profile):
-                    switchToTabBarController()
                     profileImageService.fetchProfileImageURL(username: profile.username) { imageResult in
                         
                         DispatchQueue.main.async {
                             switch imageResult {
                             case .success(let imageURL):
-                                
+                                self.switchToTabBarController()
                                 print("URL аватарки: \(imageURL)")
                             case .failure(let error):
                                 print("Oшибка получения URL аватарки: \(error.localizedDescription)")
@@ -101,50 +126,49 @@ extension SplashViewController: AuthViewControllerDelegate {
                     }
                     
                 case .failure(let error):
-                    print("Ошибка при загрузке профился с Unsplash: \(error.localizedDescription)")
+                    
+                    self.showErrorAlert(message: "Не удалось загрузить профиль")
+                    print("[SplashViewController]: Ошибка при загрузке профиля - \(error.localizedDescription)")
+                    
                 }
             }
         }
     }
     
-    func authViewController(_ vc: AuthViewController, didAuthenticateWithCode code: String) {
-        
-        UIBlockingProgressHUD.show()
-        
-        oauth2Service.fetchOAuthToken(code) { [weak self] result in
-            print("Результат запроса токена: \(result)")
-            
-            UIBlockingProgressHUD.dismiss()
-            
+    private func fetchProfileImageURL(username: String) {
+        profileImageService.fetchProfileImageURL(username: username) { [weak self] result in
+            guard let self = self else { return }
             switch result {
-            case .success(let token):
-                OAuth2TokenStorage().token = token
-                vc.dismiss(animated: true) {
-                    self?.fetchProfile(token)
-                }
+            case .success(let imageURL):
+                self.switchToTabBarController()
+                print("URL аватарки: \(imageURL)")
             case .failure(let error):
-                print("Ошибка получения токена: \(error.localizedDescription)")
-                vc.dismiss(animated: true)
+                self.showErrorAlert(message: "Не удалось загрузить аватарку")
+                print("[SplashViewController]: Ошибка получения URL аватарки - \(error.localizedDescription)")
             }
         }
     }
     
-    private func fetchOAuthToken(_ code: String) {
-        oauth2Service.fetchOAuthToken(code) { [weak self] result in
-            DispatchQueue.main.async {
-                guard let self = self else { return }
-                switch result {
-                case .success:
-                    self.switchToTabBarController()
-                    UIBlockingProgressHUD.dismiss()
-                case . failure:
-                    UIBlockingProgressHUD.dismiss()
-                    break
-                }
-            }
+    private func showErrorAlert(message: String) {
+        // Проверяем, что представление загружено и находится в окне
+        guard isViewLoaded, view.window != nil else {
+            print("[SplashViewController]: Представление не в иерархии окон, алерт не будет показан")
+            return
         }
+        
+        let alert = UIAlertController(
+            title: "Что-то пошло не так(",
+            message: message,
+            preferredStyle: .alert
+        )
+        let action = UIAlertAction(title: "Ок", style: .default, handler: nil)
+        alert.addAction(action)
+        present(alert, animated: true)
     }
 }
+
+
+
 
 
 

@@ -1,4 +1,5 @@
 import UIKit
+import Kingfisher
 
 final class ProfileViewController: UIViewController {
     private var profileImageServiceObserver: NSObjectProtocol?
@@ -27,43 +28,60 @@ final class ProfileViewController: UIViewController {
         let button = UIButton()
         return button
     }()
-    
     @objc func didTapLogoutButton() {
         
     }
     
     override func viewDidLoad() {
         super.viewDidLoad()
-        
+        view.backgroundColor = .ypBlack
         if let profile = profileService.profile {
             updateUIWithProfile(profile)
         }
         setupLabels()
         
         profileImageServiceObserver = NotificationCenter.default
-            .addObserver(forName: ProfileImageService.didChangeNotification,
-                         object: nil,
-                         queue: .main
+            .addObserver(
+                forName: ProfileImageService.didChangeNotification,
+                object: nil,
+                queue: .main
             ) { [weak self] _ in
                 guard let self = self else { return }
+                self.updateAvatar()
             }
         updateAvatar()
-        print("Small Image URL: \(String(describing: ProfileImageService.shared.avatarURL))")
+        //print("Small Image URL: \(String(describing: ProfileImageService.shared.avatarURL))")
+    }
+    
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        avatarImageView.layer.cornerRadius = avatarImageView.frame.size.width / 2
+        avatarImageView.clipsToBounds = true
     }
     
     private func updateAvatar() {
         guard
-            let profileImageURL = ProfileImageService.shared.avatarURL,
-            let url = URL(string: profileImageURL)
+            let smallImageURL = ProfileImageService.shared.avatarURL,
+            let url = URL(string: smallImageURL)
         else { return }
+        
+        avatarImageView.kf.setImage(with: url,
+                                    placeholder: UIImage(named: "Photo")) { result in
+            switch result {
+            case .success(let value):
+                print("Изображение загружено: \(value.source.url?.absoluteString ?? "")")
+            case .failure(let error):
+                print("Ошибка загрузки изображения: \(error.localizedDescription)")
+            }
+        }
     }
     
-    func setupLabels() {
+    private func setupLabels() {
         // safeArea констрейнт
         let safeArea = view.safeAreaLayoutGuide
         // Изображение Аватара and constraint
-        let avatarImage = UIImage(named: "Photo")
-        let avatarImageView = UIImageView(image: avatarImage)
+        let avatarImageView = self.avatarImageView
+        //avatarImageView.image = UIImage(named: "Photo") // Устанавливаем изображение по умолчанию
         avatarImageView.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(avatarImageView)
         
@@ -73,6 +91,7 @@ final class ProfileViewController: UIViewController {
             avatarImageView.widthAnchor.constraint(equalToConstant: 70),
             avatarImageView.heightAnchor.constraint(equalToConstant: 70)
         ])
+        
         // label с именем and constraints
         let nameLabel = UILabel()
         nameLabel.translatesAutoresizingMaskIntoConstraints = false
@@ -126,25 +145,7 @@ final class ProfileViewController: UIViewController {
             logoutButton.centerYAnchor.constraint(equalTo: avatarImageView.centerYAnchor)
         ])
     }
-    /* func fetchUserProfile() {
-     let token = OAuth2TokenStorage().token ?? ""
-     
-     ProfileService().fetchProfile(token) { [weak self] result in
-     switch result {
-     case .success(let profile):
-     DispatchQueue.main.async {
-     self?.nameLabel.text = profile.name
-     self?.loginNameLabel.text = profile.loginName
-     self?.desriptionLabel.text = profile.bio
-     }
-     case .failure(let error):
-     // Обработка ошибки
-     DispatchQueue.main.async {
-     print("Ошибка при загрузке профился с Unsplash: \(error.localizedDescription)")
-     }
-     }
-     }
-     }*/
+    
     private func updateUIWithProfile(_ profile: Profile) {
         DispatchQueue.main.async {
             self.nameLabel.text = profile.name

@@ -1,14 +1,10 @@
-//
-//  ProfileImageService.swift
-//  ImageFeedProject
-//
-//  Created by  Игорь Килеев on 04.04.2024.
-//
-
 import Foundation
+
 enum ProfileImageError: Error {
     case other(Error)
     case unauthorized
+    case invalidURL
+    case missingToken
 }
 
 final class ProfileImageService: ProfileImageServiceProtocol {
@@ -17,10 +13,67 @@ final class ProfileImageService: ProfileImageServiceProtocol {
     static let shared = ProfileImageService()
     private init() {}
     
-    let token = OAuth2TokenStorage().token
+    private let urlSession = URLSession.shared
     
-    func makeProfileRequest(withToken token: String )-> URLRequest {
-        let url = URL(string: "https://api.unsplash.com/me")!
+    private var task: URLSessionTask?
+    
+    private var token: String? {
+        return OAuth2TokenStorage().token
+    }
+    
+    func fetchProfileImageURL(username: String, completion: @escaping (Result<String, Error>) -> Void) {
+        guard let token = token else {
+            completion(.failure(ProfileImageError.missingToken))
+            return
+        }
+        
+        guard let request = makeProfileRequest(username: username, token: token) else {
+            completion(.failure(ProfileImageError.invalidURL))
+            return
+        }
+        
+        // Отменяем предыдущую задачу, если она есть
+        task?.cancel()
+        
+        let task = urlSession.objectTask(for: request) { [weak self] (result: Result<UserResult, Error>) in
+            guard let self = self else { return }
+            switch result {
+            case .success(let userResult):
+                let smallImageURL = userResult.profileImage.medium
+                self.avatarURL = smallImageURL
+                completion(.success(smallImageURL))
+                
+                
+                
+                NotificationCenter.default
+                    .post(
+                        name: ProfileImageService.didChangeNotification,
+                        object: self,
+                        userInfo: ["URL": smallImageURL])
+            case .failure(let error):
+                if let urlError = error as? URLError, urlError.code == .cancelled {
+                    // Задача была отменена, ничего не делаем
+                    return
+                } else if let networkError = error as? NetworkError,
+                          case .httpStatusCode(let statusCode) = networkError,
+                          statusCode == 401 {
+                    print("[ProfileImageService]: Unauthorized - код ошибки \(statusCode)")
+                    completion(.failure(ProfileImageError.unauthorized))
+                } else {
+                    print("[ProfileImageService]: Ошибка получения аватарки - \(error.localizedDescription)")
+                    completion(.failure(ProfileImageError.other(error)))
+                }
+            }
+        }
+        self.task = task
+        task.resume()
+    }
+    
+    private func makeProfileRequest(username: String, token: String) -> URLRequest? {
+        let urlString = "https://api.unsplash.com/users/\(username)"
+        guard let url = URL(string: urlString) else {
+            return nil
+        }
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
@@ -31,12 +84,6 @@ final class ProfileImageService: ProfileImageServiceProtocol {
         let small: String
         let medium: String
         let large: String
-        
-        enum CodingKeys: String,CodingKey {
-            case small = "small"
-            case medium = "medium"
-            case large = "large"
-        }
     }
     
     struct UserResult: Codable {
@@ -46,59 +93,4 @@ final class ProfileImageService: ProfileImageServiceProtocol {
             case profileImage = "profile_image"
         }
     }
-    func fetchProfileImageURL(username: String,  completion: @escaping (Result<String,Error>) -> Void) {
-        guard let token = token else { return }
-        let request = makeProfileRequest(withToken: token)
-        
-        let task = URLSession.shared.dataTask(with: request) { data, response, error in
-            DispatchQueue.main.async {
-                if let error = error {
-                    completion(.failure(ProfileImageError.other(error)))
-                    return
-                }
-                guard let httpResponse = response as? HTTPURLResponse else {
-                    completion(.failure(ProfileImageError.other(URLError(.badServerResponse))))
-                    return
-                }
-                
-                guard httpResponse.statusCode == 200 else {
-                    if httpResponse.statusCode == 401 {
-                        completion(.failure(ProfileImageError.unauthorized))
-                    } else {
-                        completion(.failure(ProfileImageError.other(URLError(.badServerResponse))))
-                    }
-                    return
-                }
-                guard let data = data else {
-                    completion(.failure(ProfileImageError.other(URLError(.cannotParseResponse))))
-                    return
-                }
-                
-                do {
-                    let userResult = try JSONDecoder().decode(UserResult.self, from: data)
-                    //print(String(data: data, encoding: .utf8) ?? "No valid data")
-                    
-                    let smallImageURL = userResult.profileImage.small
-                    self.avatarURL = smallImageURL
-                    print("Small Image URL1: \(smallImageURL)")
-                    completion(.success(smallImageURL))
-                    NotificationCenter.default
-                        .post(name: ProfileImageService.didChangeNotification,
-                              object: self,
-                              userInfo: ["URL" : smallImageURL])
-                    
-                } catch {
-                    print("Ошибка декодирования \(error)")
-                    completion(.failure(ProfileImageError.other(error)))
-                }
-                
-            }
-            
-        }
-        task.resume()
-        
-    }
 }
-
-
-
