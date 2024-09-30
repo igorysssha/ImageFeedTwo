@@ -103,37 +103,32 @@ extension SplashViewController {
     private func fetchProfile(_ token: String) {
         guard !isFetchingProfile else { return }
         isFetchingProfile = true
+        
+        // Показываем индикатор загрузки на главном потоке
         DispatchQueue.main.async {
             UIBlockingProgressHUD.show()
-            self.profileService.fetchProfile(token) { [weak self] result  in
+        }
+        
+        profileService.fetchProfile(token) { [weak self] result in
+            guard let self = self else { return }
+            
+            // Скрываем индикатор загрузки на главном потоке
+            DispatchQueue.main.async {
                 UIBlockingProgressHUD.dismiss()
-                
-                guard let self = self else { return }
-                
-                switch result {
-                case .success(let profile):
-                    profileImageService.fetchProfileImageURL(username: profile.username) { imageResult in
-                        
-                        DispatchQueue.main.async {
-                            switch imageResult {
-                            case .success(let imageURL):
-                                self.switchToTabBarController()
-                                print("URL аватарки: \(imageURL)")
-                            case .failure(let error):
-                                print("Oшибка получения URL аватарки: \(error.localizedDescription)")
-                            }
-                        }
-                    }
-                    
-                case .failure(let error):
-                    
+            }
+            
+            switch result {
+            case .success(let profile):
+                self.fetchProfileImageURL(username: profile.username)
+            case .failure(let error):
+                DispatchQueue.main.async {
                     self.showErrorAlert(message: "Не удалось загрузить профиль")
-                    print("[SplashViewController]: Ошибка при загрузке профиля - \(error.localizedDescription)")
-                    
                 }
+                print("[SplashViewController]: Ошибка при загрузке профиля - \(error.localizedDescription)")
             }
         }
     }
+
     
     private func fetchProfileImageURL(username: String) {
         profileImageService.fetchProfileImageURL(username: username) { [weak self] result in

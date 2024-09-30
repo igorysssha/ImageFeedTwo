@@ -105,12 +105,17 @@ extension URLRequest {
         path: String,
         httpMethod: String,
         baseURL: URL = DefaultBaseURL
-    ) -> URLRequest {
-        var request = URLRequest(url: URL(string: path, relativeTo: baseURL)!)
+    ) -> URLRequest? {
+        guard let url = URL(string: path, relativeTo: baseURL) else {
+            print("Не удалось создать URL из пути \(path)")
+            return nil
+        }
+        var request = URLRequest(url: url)
         request.httpMethod = httpMethod
         return request
     }
 }
+
 
 extension URLSession {
     func data(

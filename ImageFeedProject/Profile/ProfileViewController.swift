@@ -50,7 +50,7 @@ final class ProfileViewController: UIViewController {
                 self.updateAvatar()
             }
         updateAvatar()
-        //print("Small Image URL: \(String(describing: ProfileImageService.shared.avatarURL))")
+        
     }
     
     override func viewDidLayoutSubviews() {
@@ -77,11 +77,11 @@ final class ProfileViewController: UIViewController {
     }
     
     private func setupLabels() {
-        // safeArea констрейнт
+        
         let safeArea = view.safeAreaLayoutGuide
-        // Изображение Аватара and constraint
+        
         let avatarImageView = self.avatarImageView
-        //avatarImageView.image = UIImage(named: "Photo") // Устанавливаем изображение по умолчанию
+        
         avatarImageView.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(avatarImageView)
         
@@ -92,11 +92,11 @@ final class ProfileViewController: UIViewController {
             avatarImageView.heightAnchor.constraint(equalToConstant: 70)
         ])
         
-        // label с именем and constraints
+        
         let nameLabel = UILabel()
         nameLabel.translatesAutoresizingMaskIntoConstraints = false
         nameLabel.font = UIFont.systemFont(ofSize: 23, weight: .bold)
-        //nameLabel.text = "Екатерина Новикова"
+        
         nameLabel.textColor = .ypWhite
         view.addSubview(nameLabel)
         self.nameLabel = nameLabel
@@ -105,11 +105,11 @@ final class ProfileViewController: UIViewController {
             nameLabel.topAnchor.constraint(equalTo: avatarImageView.bottomAnchor, constant: 8),
             nameLabel.leadingAnchor.constraint(equalTo: safeArea.leadingAnchor, constant: 16)
         ])
-        // loginName label and constraints
+        
         let loginNameLabel = UILabel()
         loginNameLabel.translatesAutoresizingMaskIntoConstraints = false
         loginNameLabel.font = UIFont.systemFont(ofSize: 13)
-        //loginNameLabel.text = "@ekaterina_nov"
+        
         loginNameLabel.textColor = .ypGray
         view.addSubview(loginNameLabel)
         self.loginNameLabel = loginNameLabel
@@ -118,11 +118,11 @@ final class ProfileViewController: UIViewController {
             loginNameLabel.topAnchor.constraint(equalTo: nameLabel.bottomAnchor, constant: 8),
             loginNameLabel.leadingAnchor.constraint(equalTo: nameLabel.leadingAnchor)
         ])
-        //desriptionLabel and constraints
+       
         let desriptionLabel = UILabel()
         desriptionLabel.translatesAutoresizingMaskIntoConstraints = false
         desriptionLabel.font = UIFont.systemFont(ofSize: 13)
-        //desriptionLabel.text = "Hello, World!"
+        
         desriptionLabel.textColor = .ypWhite
         view.addSubview(desriptionLabel)
         self.desriptionLabel = desriptionLabel
@@ -132,8 +132,11 @@ final class ProfileViewController: UIViewController {
             desriptionLabel.leadingAnchor.constraint(equalTo: loginNameLabel.leadingAnchor)
         ])
         
-        // logout button and constraint
-        let logoutButton = UIButton.systemButton(with: UIImage(named: "Exit")!,
+        guard let exitImage = UIImage(named: "Exit") else {
+            assertionFailure("Не удалось загрузить изображение 'Exit'")
+            return
+        }
+        let logoutButton = UIButton.systemButton(with: exitImage,
                                                  target: self,
                                                  action: #selector(Self.didTapLogoutButton))
         logoutButton.translatesAutoresizingMaskIntoConstraints = false
@@ -147,11 +150,13 @@ final class ProfileViewController: UIViewController {
     }
     
     private func updateUIWithProfile(_ profile: Profile) {
-        DispatchQueue.main.async {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
             self.nameLabel.text = profile.name
             self.loginNameLabel.text = profile.loginName
             self.desriptionLabel.text = profile.bio
         }
     }
+    
 }
 
