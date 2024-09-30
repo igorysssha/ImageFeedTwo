@@ -8,15 +8,13 @@ enum ProfileImageError: Error {
 }
 
 final class ProfileImageService: ProfileImageServiceProtocol {
+    
     static let didChangeNotification = Notification.Name(rawValue: "ProfileImageProviderDidChange")
-    private(set) var avatarURL: String?
     static let shared = ProfileImageService()
-    private init() {}
+    private(set) var avatarURL: String?
     
     private let urlSession = URLSession.shared
-    
     private var task: URLSessionTask?
-    
     private var token: String? {
         return OAuth2TokenStorage().token
     }
@@ -79,6 +77,8 @@ final class ProfileImageService: ProfileImageServiceProtocol {
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         return request
     }
+    
+    private init() {}
     
     struct ProfileImage: Codable {
         let small: String
